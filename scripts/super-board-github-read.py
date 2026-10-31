@@ -69,6 +69,9 @@ def halt_path():
     # One repo, every worktree: <main checkout>/.claude/super-board/ when the common
     # dir is <root>/.git; a submodule's (.git/modules/<path>) is not, so keep it inside.
     common = Path(result.stdout.strip())
+    # A workspace shares one token bucket, so every repo in it shares one halt file.
+    if common.name == '.git' and (common.parent.parent / '.claude/super-board/workspace').is_file():
+        return common.parent.parent / '.claude/super-board/github-halt.json'
     state = common.parent / '.claude/super-board' if common.name == '.git' else common / 'super-board'
     return state / 'github-halt.json'
 

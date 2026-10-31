@@ -8,6 +8,37 @@ workers. Lane lifecycles, branch/PR model, comment cadence, Block
 templates, halt gates, and done conditions are all inherited from `run.md`
 unchanged.
 
+## Workspace boards (one board, many repos)
+
+A config with a `repos` map is a workspace board (config-schema.json → `repos`). Run it from
+the workspace root, the folder holding the sibling checkouts, with the pack installed there
+(`install.sh <workspace-root>`). The root need not be a git repo.
+
+Claude waves only. `--codex`, a Codex host and `usage_fallback: "codex"` lanes refuse with exit
+78: on a Codex host, halt before any claim and say so. The legacy `claude-p` backend is refused too.
+
+The wave loop below applies, with these changes:
+
+- **Plan.** `super-board-wave-plan.sh --config <workspace config>` validates the workspace and
+  writes one resolved single-repo config per repo to `.claude/super-board/resolved/<slug>/`. Every
+  card, sweep, resume, refreshApproval, flag and stranded entry carries `repo`, `key`
+  (`<repo>#<n>`), `configPath`, `repoPath`, `repoSlug` and `workspaceRoot`. Exit 66 prints every problem found.
+- **Identity.** `#12` exists in several repos. Report and log cards by `key`. Never act on a bare number.
+- **Orchestrator writes.** Add `--repo <repoSlug>` to every `gh issue`/`gh pr` call, and use the
+  entry's `configPath` with `super-board-card.sh`, because the workspace root has no remote to infer.
+- **Preconditions.** Run the worktree scan and database reach per repo, using each resolved
+  config, and the production-merge guard against each repo's `base_branch`. Locks, usage and
+  throttle stay on the workspace config: one `max_workers` and one GitHub token bucket.
+- **Launch.** Pass the workspace `configPath` and the planner's cards unchanged. The workflow
+  scopes each agent to its card's checkout and batches pre-flight per repo.
+- **Merging.** Each repo keeps its own merge lock, `base_branch`, `verify_commands`, `merge_policy`
+  and `migrations`. Nothing merges two repos atomically: order a cross-repo change with `## Blocked by`.
+- **Halt.** One GitHub halt file at the workspace root covers every repo.
+- **Manifest.** `docs/super-board/runs/` stays at the workspace root; add a `repo` to each row by using `key` in place of `#N`.
+- **Permissions.** Lanes call the pack by absolute path. Add the output of
+  `python3 .claude/bin/super-board-workspace.py allowlist --config <config>` (`--merge` adds the merge
+  lines) to the workspace's `.claude/settings.json`, alongside the base `gh`/`git` rules below.
+
 ## Codex runs
 
 `/super-board run --codex` uses headless Codex for every lane of every wave,
@@ -341,6 +372,7 @@ don't stall on prompts:
     "Bash(.claude/bin/super-board-github-read.py:*)",
     "Bash(python3 .claude/bin/super-board-verification-ready.py:*)",
     "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
+    "Bash(python3 .claude/bin/super-board-workspace.py:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",

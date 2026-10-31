@@ -141,11 +141,12 @@ read_card() {  # $1 = issue; sets ITEM_ID STATUS_NAME
   [ -n "$node" ] || { echo "#$1 is not on project $OWNER/$NUMBER" >&2; return 3; }
   ITEM_ID=$(echo "$node" | jq -r .id)
   STATUS_NAME=$(echo "$node" | jq -r '.fieldValueByName.name // ""')
-  cache_put '.items[$k] = $v' --arg k "$1" --arg v "$ITEM_ID"
+  # Keyed by repo: one board spans repos on a workspace, and #12 exists in each.
+  cache_put '.items[$k] = $v' --arg k "$REPO#$1" --arg v "$ITEM_ID"
 }
 
 item_id() {  # $1 = issue
-  ITEM_ID=$(cache_get ".items[\"$1\"]")
+  ITEM_ID=$(cache_get ".items[\"$REPO#$1\"]")
   [ -n "$ITEM_ID" ] || read_card "$1"
 }
 

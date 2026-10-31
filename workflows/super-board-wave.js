@@ -16,6 +16,9 @@ export const meta = {
 //   cards: [{ number, status, title, lane, labels }],  // output of super-board-wave-plan.sh
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
+//     On a workspace board each card also carries repo, key ('<repo>#<n>'), configPath,
+//     repoPath, repoSlug and workspaceRoot (super-board-workspace.py plan). Issue numbers
+//     are only unique inside a repo, so `key` is the card's identity.
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
@@ -37,6 +40,26 @@ const labelsOf = (card) => (card.labels || []).map((l) => String(l).toLowerCase(
 const readyLane = (card) => card.lane || (labelsOf(card).includes('qa') ? 'qa' : 'build')
 if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
   throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
+}
+
+const keyOf = (card) => card.key || card.number
+const refOf = (card) => card.key || `#${card.number}`
+// A workspace card's agent starts at the workspace root, which is not a git repo. Point
+// the prompt at the card's checkout and config; the pack stays in the workspace.
+const scoped = (card, text) => {
+  if (!card.repoPath) return text
+  const pack = `${card.workspaceRoot}/.claude`
+  const body = text
+    .split(input.configPath).join(card.configPath)
+    .split('.claude/bin/').join(`${pack}/bin/`)
+    .split('.claude/skills/').join(`${pack}/skills/`)
+    .split('--root "$PWD"').join(`--root "${card.workspaceRoot}"`)
+  return [
+    `Workspace board. This card is in repo ${card.repo} (${card.repoSlug}), checkout ${card.repoPath}.`,
+    `Run cd "${card.repoPath}" before anything else, and again in any shell that lost it. Issue and PR numbers here mean this repo; gh and git run from this checkout. Other repos are written <repo>#<n>; never edit them.`,
+    `In every super-board doc and script you read: .claude/bin/, .claude/skills/ and .claude/workflows/ mean ${pack}/bin/, ${pack}/skills/ and ${pack}/workflows/. .claude/worktrees/ stays relative to this checkout. Use ${card.configPath} as the config.`,
+    body,
+  ].join('\n')
 }
 
 let halted = false
@@ -189,8 +212,8 @@ const runLane = async (lane, card, model, history) => {
     history.push({ lane, ...result })
     return result
   }
-  const r = await agent(lanePrompt(lane, card), {
-    label: `${lane}:#${card.number}`,
+  const r = await agent(scoped(card, lanePrompt(lane, card)), {
+    label: `${lane}:${refOf(card)}`,
     phase: LANE[lane].phase,
     schema: STAGE_SCHEMA,
     ...(model ? { model } : {}),
@@ -238,7 +261,7 @@ const preflightPrompt = (batch) => [
   READ_FAILURE,
   `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
   `Read .claude/skills/super-board/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
-  `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
+  `Other cards in this wave: ${JSON.stringify(input.cards.filter((c) => c.repo === batch[0].repo).map(({ number, status, title }) => ({ number, status, title })))}`,
   `Run .claude/bin/super-board-preflight.sh once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,
   `Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.`,
@@ -251,16 +274,20 @@ const preflightPrompt = (batch) => [
 const ready = input.cards.filter((c) => c.status === 'Ready' && readyLane(c) === 'build')
 const verdicts = new Map()
 const batches = []
-for (let i = 0; i < ready.length; i += PREFLIGHT_BATCH) batches.push(ready.slice(i, i + PREFLIGHT_BATCH))
+// A batch stays inside one repo: the pre-flight script takes one --repo.
+for (const repo of new Set(ready.map((c) => c.repo))) {
+  const own = ready.filter((c) => c.repo === repo)
+  for (let i = 0; i < own.length; i += PREFLIGHT_BATCH) batches.push(own.slice(i, i + PREFLIGHT_BATCH))
+}
 await Promise.all(batches.map(async (batch) => {
-  const r = await agent(preflightPrompt(batch), {
-    label: `preflight:${batch.map((c) => '#' + c.number).join(',')}`,
+  const r = await agent(scoped(batch[0], preflightPrompt(batch)), {
+    label: `preflight:${batch[0].repo ? batch[0].repo + ':' : ''}${batch.map((c) => '#' + c.number).join(',')}`,
     phase: 'Pre-flight',
     model: preflightModel,
     schema: PREFLIGHT_SCHEMA,
   })
   for (const v of (r && r.verdicts) || []) {
-    verdicts.set(v.number, v)
+    verdicts.set(keyOf({ number: v.number, key: batch[0].repo ? `${batch[0].repo}#${v.number}` : undefined }), v)
     if (v.verdict === 'halted') halted = true
   }
 }))
@@ -268,14 +295,14 @@ await Promise.all(batches.map(async (batch) => {
 // No column and an empty blockedBy is the same case: nothing to wait on never parks a
 // card (2026-10-03: #180/#181 each "sequenced" behind the other, neither built).
 const preflightGo = (card) => {
-  const v = verdicts.get(card.number)
+  const v = verdicts.get(keyOf(card))
   if (!v) return false
   if (v.verdict === 'proceed') return true
   return v.verdict === 'sequence' && (v.column === 'Ready' ||
     (!v.column && Array.isArray(v.blockedBy) && v.blockedBy.length === 0))
 }
 const preflightExit = (card) => {
-  const v = verdicts.get(card.number) ||
+  const v = verdicts.get(keyOf(card)) ||
     { verdict: 'skipped', detail: 'pre-flight returned no verdict — not built unchecked; retried next wave' }
   return {
     lane: 'preflight',
@@ -293,14 +320,14 @@ const results = await pipeline(
     if (card.status !== 'Ready') return { card, cls: null }
     const labels = labelsOf(card)
     const typed = ['qa', 'bug', 'feature'].find((l) => labels.includes(l))
-    const cls = await agent(
+    const cls = await agent(scoped(card,
       SKILLS_CHECK([card]) + '\n' + READ_FAILURE + '\n' + `Read GitHub issue #${card.number} ("${card.title}") — body (--kind issue) and all comments (--kind comments) — with the read shapes above. ` +
       `Classify it: kind (feature|bug|qa) and complexity (low|medium|high) judged by the scope of change required. ` +
       (typed
         ? `Its label says "${typed}": return kind "${typed}" — the label routes the card, you never override it.`
         : `It has no type label, so it is built (no label = Building). Return feature or bug — never qa, ` +
-          `which only a person sets. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. For a truly untyped card, re-run skills-ready against a copy of this card with the proposed label before any label write, then add that label: gh issue edit ${card.number} --add-label <kind>.`),
-      { label: `classify:#${card.number}`, phase: 'Classify', model: classifyModel, schema: CLASSIFY_SCHEMA }
+          `which only a person sets. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. For a truly untyped card, re-run skills-ready against a copy of this card with the proposed label before any label write, then add that label: gh issue edit ${card.number} --add-label <kind>.`)),
+      { label: `classify:${refOf(card)}`, phase: 'Classify', model: classifyModel, schema: CLASSIFY_SCHEMA }
     )
     if (cls && cls.status === 'halted') halted = true
     return { card, cls }
@@ -310,17 +337,17 @@ const results = await pipeline(
   // from wherever it landed (the board is the loop state, not this script).
   async (prev, card) => {
     const history = []
-    if (halted) return { number: card.number, history: [{ lane: 'none', status: 'halted', column: card.status, detail: 'run halted; preserve current work and resume explicitly' }] }
+    if (halted) return { number: card.number, card, history: [{ lane: 'none', status: 'halted', column: card.status, detail: 'run halted; preserve current work and resume explicitly' }] }
     const model = tierFor(prev && prev.cls)
     let at = card.status
 
     if (at === 'Ready' && readyLane(card) === 'build') {
       if (!preflightGo(card)) {
         history.push(preflightExit(card))
-        return { number: card.number, history }
+        return { number: card.number, card, history }
       }
       const b = await runLane('build', card, model, history)
-      if (b.status !== 'advanced') return { number: card.number, history }
+      if (b.status !== 'advanced') return { number: card.number, card, history }
       at = 'QA'
     }
     // A `qa`-labelled card skips Building: Ready → QA, Tester first
@@ -328,7 +355,7 @@ const results = await pipeline(
     if (at === 'Ready' && readyLane(card) === 'qa') at = 'QA'
     if (at === 'QA') {
       const q = await runLane('qa', card, model, history)
-      if (q.status !== 'advanced') return { number: card.number, history }
+      if (q.status !== 'advanced') return { number: card.number, card, history }
       at = 'Review'
     }
     if (at === 'Review') {
@@ -336,7 +363,7 @@ const results = await pipeline(
       // gate holds the mutex for the merge alone (see the note above).
       await runLane('review', card, undefined, history)
     }
-    return { number: card.number, history }
+    return { number: card.number, card, history }
   }
 )
 
@@ -345,6 +372,7 @@ const summary = results.filter(Boolean).map((r) => {
     { lane: 'none', status: 'failed', column: 'unknown', detail: 'no lane ran' }
   return {
     number: r.number,
+    ...(r.card && r.card.key ? { key: r.card.key, repo: r.card.repo, configPath: r.card.configPath, repoSlug: r.card.repoSlug } : {}),
     finalStatus: last.status,
     lastLane: last.lane,
     column: last.column,
@@ -355,5 +383,5 @@ const summary = results.filter(Boolean).map((r) => {
   }
 })
 log(`wave complete: ${summary.length} cards — ` +
-    summary.map((s) => `#${s.number}=${s.finalStatus}@${s.column}`).join(', '))
+    summary.map((s) => `${s.key || '#' + s.number}=${s.finalStatus}@${s.column}`).join(', '))
 return { cards: summary, halted }

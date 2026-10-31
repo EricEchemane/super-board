@@ -9,6 +9,13 @@ def readiness_error(config):
     """Return a setup error, or None when at least one project command is usable."""
     if not isinstance(config, dict):
         return "config must be a JSON object"
+    if isinstance(config.get("repos"), dict):
+        for name, entry in config["repos"].items():
+            own = entry.get("verify_commands", config.get("verify_commands")) if isinstance(entry, dict) else None
+            error = readiness_error({"verify_commands": own})
+            if error:
+                return f"repos.{name}: {error}"
+        return None
     commands = config.get("verify_commands")
     if not isinstance(commands, list) or any(not isinstance(c, str) for c in commands):
         return "verify_commands must be an array of project command strings"

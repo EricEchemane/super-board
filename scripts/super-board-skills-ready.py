@@ -421,9 +421,9 @@ def report(root, host, cards=None, profile=None, lane=None, require=(), home=Non
 
 def hydrate(cards, root):
     helper = Path(__file__).with_name('super-board-github-read.py')
-    def read_issue(number, kind, fields):
+    def read_issue(number, kind, fields, cwd):
         process = subprocess.run([sys.executable, str(helper), '--kind', kind, '--', 'issue', 'view', str(number),
-                                  '--json', fields], cwd=root, text=True, capture_output=True)
+                                  '--json', fields], cwd=cwd, text=True, capture_output=True)
         if process.returncode:
             print(process.stderr, file=sys.stderr, end='')
             raise SystemExit(process.returncode)
@@ -432,12 +432,12 @@ def hydrate(cards, root):
         if not isinstance(card, dict) or type(card.get('number')) is not int or card['number'] < 1:
             raise ValueError('card needs a positive number before issue hydration')
         if 'body' not in card:
-            data = read_issue(card['number'], 'issue', 'number,title,body')
+            data = read_issue(card['number'], 'issue', 'number,title,body', card.get('repoPath') or root)
             if data.get('number') != card['number'] or not isinstance(data.get('body'), str):
                 raise ValueError('guarded issue hydration returned the wrong issue/body')
             card['body'] = data['body']
         if 'labels' not in card:
-            data = read_issue(card['number'], 'json', 'labels')
+            data = read_issue(card['number'], 'json', 'labels', card.get('repoPath') or root)
             if not isinstance(data, dict) or not isinstance(data.get('labels'), list):
                 raise ValueError('guarded issue hydration returned no labels array')
             card['labels'] = data['labels']

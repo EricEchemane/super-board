@@ -112,6 +112,16 @@ the step-8 table, then "Onboard found an existing setup. What now?" [Keep all â€
 
 ---
 
+## Workspace boards
+
+Run from a folder holding several sibling checkouts (the root usually is not a git repo), or when
+the user asks for one board across repos: ask which checkouts belong, then write one config with a
+`repos` map instead of `repo` (config-schema.json). Take each `remote` from that checkout's origin,
+and detect `base_branch` and `verify_commands` per repo; a repo with no real checks stops onboarding,
+as it does on a single repo. Create the three labels in every repo. Finish with
+`python3 .claude/bin/super-board-workspace.py validate --config <config>`, then offer its `allowlist`
+output as the Permissions diff. Skip the git checks for the root; run them per repo.
+
 ## The answers file
 
 `.claude/super-board/onboard-answers.json` (gitignored â€” step 8 adds it):
