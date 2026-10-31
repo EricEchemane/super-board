@@ -121,6 +121,8 @@ try:
 except (OSError, ValueError, AttributeError) as error:
     fail(f'Invalid {backend.label} lane input: {error}')
 # Without --<backend> this is the usage fallback, and that is opt-in per board.
+if 'repos' in config or 'workspace' in config:
+    fail(f'{backend.label} lanes do not support workspace boards yet: use a Claude host.', 78)
 if not explicit and config.get('usage_fallback', 'none') != backend.name:
     fail(f'{backend.label} fallback refused: usage_fallback is not "{backend.name}" in {config_path}; pass {flag} for an explicit {backend.label} run.', 78)
 

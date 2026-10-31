@@ -35,6 +35,9 @@ launcher = Path(sys.argv[1]).resolve().with_name('super-board-lane.sh')
 try:
     config_path = Path(args.config).resolve()
     config = json.loads(config_path.read_text())
+    if isinstance(config, dict) and ('repos' in config or 'workspace' in config):
+        print('Codex waves do not support workspace boards yet: use a Claude host.', file=sys.stderr)
+        sys.exit(78)
     cards = json.loads(args.cards if args.cards.lstrip().startswith('[') else Path(args.cards).read_text())
     if not isinstance(config, dict) or not isinstance(cards, list):
         raise ValueError('config must be an object; cards must be an array')

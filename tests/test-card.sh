@@ -65,7 +65,7 @@ ok "warm move = 1 mutation"
 # 3 — the cache is shared state, kept out of git.
 [ -f "$TMP/cache/board-acme-15.json" ] || fail "cache file missing"
 [ "$(cat "$TMP/cache/.gitignore")" = '*' ] || fail "cache dir not self-ignored"
-jq -e '.items["232"] == "PVTI_232" and .options.QA == "opt_qa"' "$TMP/cache/board-acme-15.json" >/dev/null || fail "cache content wrong"
+jq -e '[.items | to_entries[] | select(.key | endswith("#232")) | .value] == ["PVTI_232"] and .options.QA == "opt_qa"' "$TMP/cache/board-acme-15.json" >/dev/null || fail "cache content wrong"
 ok "cache holds ids, ignores itself"
 
 # 4 — a reminted option id: first mutation fails, ids re-read, retried once.

@@ -76,6 +76,20 @@
     "url": null
   },
 
+  // Workspace board: replaces `repo` when one board drives several sibling checkouts
+  // (run-workflow.md → Workspace boards). Top-level keys are defaults; an entry overrides
+  // them, objects key by key and lists whole. `path` is relative to the workspace root;
+  // `remote` must match the checkout's origin. Each repo needs verify_commands, here or
+  // inherited. Requires worker_backend "workflow"; Codex lanes refuse it (exit 78).
+  //   "repos": {
+  //     "acme-api": { "path": "acme-api",
+  //                          "remote": "https://github.com/acme/acme-api",
+  //                          "base_branch": "staging", "verify_commands": ["go test ./..."] },
+  //     "acme-web":     { "path": "acme-web",
+  //                          "remote": "https://github.com/acme/acme-web",
+  //                          "verify_commands": ["npm ci --silent && npm run build"] }
+  //   },
+  //
   // `{path, remote}`. `remote` can be `null` for local-only (no pull requests).
   "repo": { "path": ".", "remote": "https://github.com/<owner>/<repo>" },
 

@@ -384,7 +384,7 @@ query($owner:String!, $number:Int!, $after:String) {
         items(first:100, after:$after) {
           pageInfo { endCursor hasNextPage }
           nodes {
-            content { ... on Issue { number title labels(first:20){nodes{name}} } }
+            content { ... on Issue { number title repository{nameWithOwner} labels(first:20){nodes{name}} } }
             fieldValues(first:8) {
               nodes { ... on ProjectV2ItemFieldSingleSelectValue {
                 name field { ... on ProjectV2SingleSelectField { name } } } }
@@ -494,8 +494,28 @@ def render_kanban(
     return "\n".join(boxes)
 
 
+def workspace_status(config_path: Path) -> int:
+    """A workspace board: one kanban per repo, each read from its own checkout."""
+    here = Path(__file__).resolve().parent
+    done = subprocess.run([sys.executable, str(here / "super-board-workspace.py"), "resolve",
+                           "--config", str(config_path)], capture_output=True, text=True)
+    if done.returncode:
+        print(done.stderr, file=sys.stderr, end="")
+        return done.returncode
+    worst = 0
+    for name, info in json.loads(done.stdout).items():
+        print(f"\n── {name} ──")
+        sys.stdout.flush()
+        code = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--config", info["configPath"]],
+                              cwd=info["repoPath"]).returncode
+        worst = worst or code
+    return worst
+
+
 def main() -> int:
-    config_slug = resolve_config_slug(sys.argv)
+    # `--config <resolved.json>`: one repo of a workspace, run from that checkout.
+    resolved_path = sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] == "--config" else None
+    config_slug = Path(resolved_path).stem if resolved_path else resolve_config_slug(sys.argv)
     if not valid_slug(config_slug):
         print(
             f"invalid config slug: {config_slug!r} "
@@ -503,12 +523,16 @@ def main() -> int:
             file=sys.stderr,
         )
         return 64
-    config_path = Path(f".claude/super-board/configs/{config_slug}.json")
+    config_path = Path(resolved_path or f".claude/super-board/configs/{config_slug}.json")
     if not config_path.is_file():
         print(f"config not found: {config_path}", file=sys.stderr)
         return 66
 
     cfg = json.loads(config_path.read_text())
+    if "repos" in cfg:
+        return workspace_status(config_path)
+    only_repo = (cfg.get("repo") or {}).get("remote", "") if cfg.get("workspace") else ""
+    only_repo = re.sub(r"^.*github\.com[:/]|\.git$", "", only_repo).lower()
     project_owner: str = cfg["project"]["owner"]
     project_number: int = int(cfg["project"]["number"])
     runs_dir = cfg.get("paths", {}).get("runs_dir", "docs/super-board/runs")
@@ -547,6 +571,8 @@ def main() -> int:
     for n in items_raw:
         c = n.get("content") or {}
         if not c.get("number"):
+            continue
+        if only_repo and (c.get("repository") or {}).get("nameWithOwner", "").lower() != only_repo:
             continue
         items.append({
             "number": c["number"],

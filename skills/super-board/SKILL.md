@@ -37,6 +37,7 @@ In Codex the skill is not a slash command: it is `$super-board <verb>`, found in
 | "resume" / "pick up where I left off" / "restart after stop" | `references/stop.md` (resume = run; no separate verb) |
 | Anything about Blocked exits, 🙋 needs you, or dropping a card | `references/block-template.md` |
 | Optional learning after a successfully completed run | `references/calibration.md` (external installed skill; bounded receipt; explicit existing-skill edit paths) |
+| A board across several repos, or a config with `repos` | `references/run-workflow.md` → "Workspace boards"; `references/onboard.md` → "Workspace boards" |
 | Config structure questions | `references/config-schema.json` |
 | Worker gh-call discipline / rate-limit recovery | `references/rate-limit-etiquette.md` (+ `scripts/super-board-gh-guard.sh`) |
 

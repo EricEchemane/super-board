@@ -74,20 +74,32 @@
 #     "stranded": [ {"number":44,"title":"…"} ] }
 set -euo pipefail
 
-CONFIG=""; ITEMS_FILE=""; DEPS_FILE=""
+CONFIG=""; ITEMS_FILE=""; DEPS_FILE=""; NO_CAP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --config) CONFIG="$2"; shift 2 ;;
     --items)  ITEMS_FILE="$2"; shift 2 ;;
     --deps)   DEPS_FILE="$2"; shift 2 ;;
+    --no-cap) NO_CAP=1; shift ;;  # the workspace planner caps after merging repos
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
 done
 [ -n "$CONFIG" ] && [ -e "$CONFIG" ] || { echo "config not found: ${CONFIG:-<unset>}" >&2; exit 66; }
 
+# A workspace config (`repos` map) plans one wave across every repo: see
+# super-board-workspace.py. A process substitution cannot be read twice, so only a
+# real file is probed here; the check after the read refuses one that slipped past.
+if [ -f "$CONFIG" ] && jq -e 'has("repos")' "$CONFIG" >/dev/null 2>&1; then
+  exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-workspace.py" plan --config "$CONFIG" \
+    ${ITEMS_FILE:+--items "$ITEMS_FILE"} ${DEPS_FILE:+--deps "$DEPS_FILE"}
+fi
+
 # Read the config ONCE — $CONFIG may be a process substitution (test mode),
 # which is a FIFO and cannot be read twice.
 CONFIG_JSON=$(cat "$CONFIG")
+if echo "$CONFIG_JSON" | jq -e 'has("repos")' >/dev/null 2>&1; then
+  echo "a workspace config must be a real file: .claude/super-board/configs/<slug>.json" >&2; exit 64
+fi
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/super-board-verification-ready.py" --config -
 export SB_REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
@@ -95,6 +107,7 @@ python3 "$HERE/super-board-github-read.py" --check
 VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
 # 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
 MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
+[ "$NO_CAP" = 0 ] || MAX_WORKERS=0
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 

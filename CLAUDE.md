@@ -73,6 +73,13 @@ else (and no label) is built. Change routing in `scripts/super-board-wave-plan.s
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
 
+## Workspace boards
+
+A config with `repos` drives several sibling checkouts from one board. `scripts/super-board-workspace.py`
+resolves it into one single-repo config per repo, so single-repo scripts stay single-repo: point them
+at a resolved config and that checkout. Card identity is `<repo>#<n>`; a bare number is ambiguous.
+Claude waves only: Codex lanes and the `claude-p` backend refuse.
+
 ## Writing
 
 Commits, PR bodies, tickets and comments in this repo follow

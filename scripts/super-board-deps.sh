@@ -37,8 +37,16 @@
 # "runnable" on an ambiguous line is how a card gets built against a base branch
 # that does not have what it needs yet — one wave saved, one rewrite spent.
 #
+# CROSS-REPO BLOCKERS (workspace boards only). Given --workspace-open and --aliases,
+# a blocker may name another repo in the workspace: `- acme-api#12 — why` or
+# `blocked-by: 32, acme/acme-api#12`. It appears in `blockers` as a
+# lower-case "owner/name#12" string; same-repo blockers stay plain numbers. A repo the
+# workspace does not know is `parseable: false`. Without these flags a qualified ref
+# stays unreadable, exactly as before.
+#
 # Usage:
 #   super-board-deps.sh --repo <owner/name> [--issues 12,34] [--from <payload.json>]
+#                       [--workspace-open <open-refs.json> --aliases <json>]
 #
 # Stdout, one object keyed by issue number:
 #   { "40": { "number": 40, "title": "…", "state": "OPEN",
@@ -60,13 +68,15 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO=""; LIMIT="200"; ONLY=""; FROM=""
+REPO=""; LIMIT="200"; ONLY=""; FROM=""; WS_OPEN="null"; ALIASES="{}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo)   REPO="$2"; shift 2 ;;
     --limit)  LIMIT="$2"; shift 2 ;;
     --issues) ONLY="$2"; shift 2 ;;
     --from)   FROM="$2"; shift 2 ;;   # a saved `gh issue list --json …` payload; tests use this
+    --workspace-open) WS_OPEN=$(cat "$2"); shift 2 ;;
+    --aliases) ALIASES="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
 done
@@ -95,7 +105,8 @@ fi
 
 APPROVAL_REPO="$REPO"
 [ -z "$FROM" ] || APPROVAL_REPO=""
-echo "$ISSUES" | jq --arg only "$ONLY" '
+SELF=$(printf '%s' "$REPO" | tr '[:upper:]' '[:lower:]')
+echo "$ISSUES" | jq --arg only "$ONLY" --arg self "$SELF" --argjson wsopen "$WS_OPEN" --argjson aliases "$ALIASES" '
   # ---- the parser ---------------------------------------------------------
   # Everything after the LAST "## Blocked by" heading, stopping at the next
   # "## " heading so a following section is never swallowed.
@@ -117,6 +128,24 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
   # Issue numbers on a bullet: "- #32 — The price feed" -> 32
   def refs: [ .[] | select(test("^[ \t]*-[ \t]*#[0-9]+"))
                   | capture("^[ \t]*-[ \t]*#(?<n>[0-9]+)").n | tonumber ];
+
+  # Workspace boards: a blocker token becomes a number (this repo), a lower-case
+  # "owner/name#n" (another repo), or null (unreadable, or a repo not in the workspace).
+  def canon:
+    . as $t
+    | if test("^[0-9]+$") then tonumber
+      elif $wsopen == null then null
+      else ( ($t | capture("^(?<r>[A-Za-z0-9_./-]+)#(?<n>[0-9]+)$")) // null ) as $c
+        | if $c == null then null
+          else $aliases[$c.r | ascii_downcase] as $full
+            | if $full == null then null
+              elif $full == $self then ($c.n | tonumber)
+              else "\($full)#\($c.n)" end
+          end
+      end;
+  def qualified: if $wsopen == null then [] else
+      [ .[] | select(test("^[ \t]*-[ \t]*[A-Za-z0-9_./-]+#[0-9]+"))
+            | capture("^[ \t]*-[ \t]*(?<t>[A-Za-z0-9_./-]+#[0-9]+)").t ] end;
 
   # A BULLET that claims None while naming an issue is the landmine of 2026-08-20.
   # Restricted to bullets on purpose: a blockquote underneath may legitimately
@@ -160,6 +189,8 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
                 { parseable: true, blockers: [], human_gated: true, why: "" }
               elif ($v | test("^[0-9]+(,[0-9]+)*$")) then
                 { parseable: true, blockers: ($v / "," | map(tonumber)), human_gated: false, why: "" }
+              elif $wsopen != null and ($v / "," | map(canon) | all(. != null)) then
+                { parseable: true, blockers: ($v / "," | map(canon)), human_gated: false, why: "" }
               else
                 { parseable: false, blockers: [], human_gated: false,
                   why: ("the `blocked-by:` line reads \"" + $v + "\" — it must be issue numbers alone, or `-`") }
@@ -173,6 +204,11 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           elif ($sec | none_but_names) then
             { parseable: false, blockers: ($sec | refs), human_gated: false,
               why: "the section says None and then names an issue — a planner reads no blocker, a human reads one" }
+          elif ($sec | qualified | map(canon) | any(. == null)) then
+            { parseable: false, blockers: [], human_gated: false,
+              why: "`## Blocked by` names a repo that is not in this workspace" }
+          elif (($sec | qualified) | length) > 0 then
+            { parseable: true, blockers: (($sec | refs) + ($sec | qualified | map(canon))), human_gated: false, why: "" }
           elif (($sec | refs) | length) > 0 then
             { parseable: true, blockers: ($sec | refs), human_gated: false, why: "" }
           elif ($sec | any(.[]; test("^[ \t]*-?[ \t]*[Nn]one"))) then
@@ -181,7 +217,9 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
             { parseable: false, blockers: [], human_gated: false,
               why: "`## Blocked by` section has no `- #N` bullets and no `- None.`" }
           end ) as $p
-      | ( [ $p.blockers[] | select(. as $b | $open | index($b)) ] ) as $stillOpen
+      | ( [ $p.blockers[] | select(. as $b | if ($b | type) == "string"
+                                             then (($wsopen // []) | index($b)) != null
+                                             else ($open | index($b)) end) ] ) as $stillOpen
       | { number: $i.number, title: $i.title, state: $i.state,
           blockers: $p.blockers, openBlockers: $stillOpen,
           parseable: $p.parseable,
