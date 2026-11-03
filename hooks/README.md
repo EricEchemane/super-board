@@ -135,5 +135,5 @@ Tests: `tests/test-guard-hooks.sh` (all guards and the eval gate), `tests/test-c
 - `guard-worktree-path.py` — ported from `.claude/hooks/guard-worktree-path.js` in Eric
   Tech's BookKeepingApp.
 - `guard-secrets.py`, `guard-key-literals.py` — ported from `.agents/hooks/` in Eric
-  Tech's [ai-builder-starter-kit](https://github.com/EricTechPro/ai-builder-starter-kit)
+  Tech's [ai-builder-starter-kit](https://github.com/EricEchemane/ai-builder-starter-kit)
   (same author as this pack; the kit has no top-level licence file, and this pack is MIT).

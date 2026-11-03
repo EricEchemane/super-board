@@ -28,7 +28,7 @@ The orchestrator needs to know which project board to read.
 Reads `Ready` from the repo's feature project. Resolution order:
 
 1. **`BUILD_LOOP_PROJECT`** env var — project number (e.g. `2`)
-2. **`BUILD_LOOP_OWNER`** env var — project owner (e.g. `EricTechPro`)
+2. **`BUILD_LOOP_OWNER`** env var — project owner (e.g. `EricEchemane`)
 3. **Auto-discovery fallback:** if env vars unset, run `gh project list --owner $(gh repo view --json owner -q .owner.login) --format json` and pick the project whose `title` matches the repo name, or the only open project if there's exactly one.
 
 Surface: `🎯 Reading project: <owner>/<title> (#<n>), column "Ready"`.

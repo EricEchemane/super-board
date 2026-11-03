@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # super-board one-line installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash -s -- --protect-main
+#   curl -fsSL https://raw.githubusercontent.com/EricEchemane/super-board/main/get.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/EricEchemane/super-board/main/get.sh | bash -s -- --protect-main
 #
 # Options (everything else that starts with "-" goes straight to install.sh):
 #   --target <dir>        project to install into (default: the current folder)
@@ -14,7 +14,7 @@
 #
 # Environment:
 #   SUPER_BOARD_REF       same as --ref
-#   SUPER_BOARD_REPO      GitHub owner/repo to fetch from (default EricTechPro/super-board)
+#   SUPER_BOARD_REPO      GitHub owner/repo to fetch from (default EricEchemane/super-board)
 #   SUPER_BOARD_TARBALL   exact tarball URL to fetch instead (file:// works; used by tests)
 #
 # Written for bash 3.2 (stock macOS). The whole script lives in main(), called on
@@ -57,7 +57,7 @@ security_audit_present() {
 
 main() {
   local target="" ref="${SUPER_BOARD_REF:-}" helpers=1
-  local repo="${SUPER_BOARD_REPO:-EricTechPro/super-board}"
+  local repo="${SUPER_BOARD_REPO:-EricEchemane/super-board}"
   local pass=()
 
   while [ $# -gt 0 ]; do

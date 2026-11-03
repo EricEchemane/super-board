@@ -33,7 +33,7 @@
       ],
       "sublabel": "onboard · lint · status · run · stop",
       "opensView": "super-board",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "super-collect",
@@ -55,7 +55,7 @@
       ],
       "sublabel": "sentry · posthog · github · prs · architecture · custom",
       "opensView": "super-collect",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "ui-refine-loop",
@@ -74,7 +74,7 @@
       ],
       "sublabel": "grill · check · fix · draft PR",
       "opensView": "ui-refine-loop",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "visual",
@@ -93,7 +93,7 @@
       ],
       "sublabel": "recap · plan · explore",
       "opensView": "visual",
-      "author": "EricTechPro",
+      "author": "EricEchemane",
       "credits": [
         "BuilderIO",
         "tt-a1i"
@@ -140,7 +140,7 @@
         "_skills/vendor/super-board/skills/super-board/references/onboard.md",
         "_skills/vendor/super-board/scripts/super-board-setup.py"
       ],
-      "author": "EricTechPro",
+      "author": "EricEchemane",
       "opensView": "sb-onboard"
     },
     {
@@ -154,7 +154,7 @@
         "_skills/vendor/super-board/skills/super-board/references/lint.md"
       ],
       "opensView": "sb-lint",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "sb-status",
@@ -167,7 +167,7 @@
         "_skills/vendor/super-board/skills/super-board/references/status.md",
         "_skills/vendor/super-board/scripts/super-board-status.py"
       ],
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "sb-run",
@@ -185,7 +185,7 @@
         "--high"
       ],
       "opensView": "super-board-run",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "sb-stop",
@@ -198,7 +198,7 @@
         "_skills/vendor/super-board/skills/super-board/references/stop.md",
         "_skills/vendor/super-board/scripts/super-board-stop.sh"
       ],
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "super-build",
@@ -214,7 +214,7 @@
         "_skills/vendor/super-board/skills/super-board/references/run.md"
       ],
       "opensView": "super-build",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "super-qa",
@@ -229,7 +229,7 @@
         "_skills/vendor/super-board/skills/super-board/references/run.md"
       ],
       "opensView": "super-qa",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "super-review",
@@ -242,7 +242,7 @@
         "_skills/vendor/super-board/skills/super-review/SKILL.md"
       ],
       "opensView": "super-review",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "super-deploy",
@@ -253,7 +253,7 @@
       "when": "It would start **after a merge**, once super-review lands a PR. It is ==not built yet==.",
       "how": "The plan is to **watch the deploy**, then smoke-test the live site. On a failure it would ==roll back==. Last, it would check **Sentry** and **PostHog** for new errors.",
       "source": [],
-      "author": "EricTechPro",
+      "author": "EricEchemane",
       "examples": [
         {
           "title": "Plan",
@@ -689,7 +689,7 @@
       "external": true,
       "origin": "EricOS local skill",
       "opensView": "tdd-v2",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "implement",
@@ -1004,7 +1004,7 @@
       "external": true,
       "origin": "erictech-skills (override of mattpocock grill-with-docs)",
       "opensView": "grill-with-docs",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "prototype",
@@ -1572,7 +1572,7 @@
       ],
       "sublabel": "commit · pull · push",
       "opensView": "git-sync",
-      "author": "EricTechPro"
+      "author": "EricEchemane"
     },
     {
       "id": "pr-security-review",
@@ -1596,7 +1596,7 @@
       "when": "Only when you run **/security-audit** or ask to security audit or pen-test a codebase. ==No lane runs it==; super-review may point you at it for a whole-repo pass, and a focused security question uses guidance mode and writes nothing.",
       "how": "Recon agents map the code into a coverage ledger, isolated hunters work through it with critics after each wave, and a **fresh verifier** ==tries to disprove every candidate==. Findings land in findings.json, checked by two Node validators and re-checked by fresh agents before the three reports are written. get.sh and onboard's Checks install it with `npx skills add cloudflare/security-audit-skill --skill security-audit`; it is optional in the skills-ready registry, so a missing copy never halts a run.",
       "source": [
-        "https://erictechpro.github.io/super-board/security-audit/",
+        "https://ericechemane.github.io/super-board/security-audit/",
         "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md",
         "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md"
       ],
@@ -5870,9 +5870,9 @@
     "Unchanged from v2: ui-refine-loop is standalone, now stated in super-review and super-qa as 'file a UI ticket; a human can run /ui-refine-loop'. cleanup-wt still runs at SessionStart and post-merge. qa-test-planner, testing-strategy, vitest and playwright-best-practices are still not installed in EricOS."
   ],
   "authors": {
-    "EricTechPro": {
-      "name": "Eric Tech",
-      "url": "https://github.com/EricTechPro"
+    "EricEchemane": {
+      "name": "Eric Echemane",
+      "url": "https://github.com/EricEchemane"
     },
     "mattpocock": {
       "name": "Matt Pocock",
